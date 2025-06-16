@@ -1,11 +1,25 @@
 import random
 from dataclasses import dataclass
+from enum import Enum, auto
+from typing import List
 
 
 @dataclass
 class Player:
     name: str
     skill: float = 0.5  # probability of winning a rally
+    dupr: float = 3.0  # Dynamic Universal Pickleball Rating
+
+
+class ShotType(Enum):
+    """Possible shot types in a rally."""
+
+    SERVE = auto()
+    DRIVE = auto()
+    DROP = auto()
+    LOB = auto()
+    DINK = auto()
+    VOLLEY = auto()
 
 
 class Game:
@@ -37,11 +51,14 @@ class Game:
         # Return the opposing player if the server loses the rally
         return self.player1 if self.server is self.player2 else self.player2
 
-    def play_point(self) -> Player:
+    def play_point(self, return_shot: bool = False):
         """Play a single rally and update internal state."""
+        shot = random.choice(list(ShotType))
         winner = self.rally_winner()
         self.score[winner.name] += 1
         self.server = winner
+        if return_shot:
+            return winner, shot
         return winner
 
     def _game_finished(self) -> bool:
@@ -59,9 +76,9 @@ class Game:
             If ``True``, display the score after each rally.
         """
         while not self._game_finished():
-            self.play_point()
+            winner, shot = self.play_point(return_shot=True)
             if verbose:
-                print(self.score_display())
+                print(f"{shot.name.title()} won by {winner.name} -> {self.score_display()}")
         return max(self.score, key=self.score.get)
 
     def score_display(self) -> str:
@@ -70,3 +87,28 @@ class Game:
             f"{self.player1.name}: {self.score[self.player1.name]} - "
             f"{self.player2.name}: {self.score[self.player2.name]}"
         )
+
+
+class DoublesGame(Game):
+    """Simplified doubles game using averaged team skills."""
+
+    def __init__(
+        self,
+        team1: List[Player],
+        team2: List[Player],
+        winning_score: int = 11,
+        win_by: int = 2,
+    ):
+        p1 = Player(
+            "/".join(p.name for p in team1),
+            skill=sum(p.skill for p in team1) / len(team1),
+            dupr=sum(p.dupr for p in team1) / len(team1),
+        )
+        p2 = Player(
+            "/".join(p.name for p in team2),
+            skill=sum(p.skill for p in team2) / len(team2),
+            dupr=sum(p.dupr for p in team2) / len(team2),
+        )
+        super().__init__(p1, p2, winning_score=winning_score, win_by=win_by)
+        self.team1 = team1
+        self.team2 = team2
